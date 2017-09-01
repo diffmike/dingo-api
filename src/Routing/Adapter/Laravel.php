@@ -5,12 +5,19 @@ namespace Dingo\Api\Routing\Adapter;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
-use Illuminate\Routing\RouteCollection;
 use Dingo\Api\Contract\Routing\Adapter;
+use Illuminate\Routing\RouteCollection;
 use Dingo\Api\Exception\UnknownVersionException;
 
 class Laravel implements Adapter
 {
+    /**
+     * Application container instance.
+     *
+     * @var \Illuminate\Contracts\Container\Container
+     */
+    protected $container;
+
     /**
      * Laravel router instance.
      *
@@ -26,7 +33,14 @@ class Laravel implements Adapter
     protected $routes = [];
 
     /**
-     * Old routes already defined on the router.
+     * Array of merged old routes and API routes.
+     *
+     * @var array
+     */
+    protected $mergedRoutes = [];
+
+    /**
+     * Routes already defined on the router.
      *
      * @var \Illuminate\Routing\RouteCollection
      */
@@ -58,31 +72,41 @@ class Laravel implements Adapter
             throw new UnknownVersionException;
         }
 
-        $routes = $this->mergeExistingRoutes($this->routes[$version]);
+        $routes = $this->mergeOldRoutes($version);
 
         $this->router->setRoutes($routes);
 
-        return $this->router->dispatch($request);
+        $router = clone $this->router;
+
+        $response = $router->dispatch($request);
+
+        unset($router);
+
+        return $response;
     }
 
     /**
-     * Merge the existing routes with the new routes.
+     * Merge the old application routes with the API routes.
      *
-     * @param \Illuminate\Routing\RouteCollection $routes
+     * @param string $version
      *
-     * @return \Illuminate\Routing\RouteCollection
+     * @return array
      */
-    protected function mergeExistingRoutes(RouteCollection $routes)
+    protected function mergeOldRoutes($version)
     {
         if (! isset($this->oldRoutes)) {
             $this->oldRoutes = $this->router->getRoutes();
         }
 
-        foreach ($this->oldRoutes as $route) {
-            $routes->add($route);
+        if (! isset($this->mergedRoutes[$version])) {
+            $this->mergedRoutes[$version] = $this->routes[$version];
+
+            foreach ($this->oldRoutes as $route) {
+                $this->mergedRoutes[$version]->add($route);
+            }
         }
 
-        return $routes;
+        return $this->mergedRoutes[$version];
     }
 
     /**
@@ -154,6 +178,13 @@ class Laravel implements Adapter
         return $this->routes;
     }
 
+    /**
+     * Get a normalized iterable set of routes.
+     *
+     * @param string $version
+     *
+     * @return mixed
+     */
     public function getIterableRoutes($version = null)
     {
         return $this->getRoutes($version);
@@ -194,6 +225,20 @@ class Laravel implements Adapter
      */
     public function gatherRouteMiddlewares($route)
     {
+        if (method_exists($this->router, 'gatherRouteMiddleware')) {
+            return $this->router->gatherRouteMiddleware($route);
+        }
+
         return $this->router->gatherRouteMiddlewares($route);
+    }
+
+    /**
+     * Get the Laravel router instance.
+     *
+     * @return \Illuminate\Routing\Router
+     */
+    public function getRouter()
+    {
+        return $this->router;
     }
 }

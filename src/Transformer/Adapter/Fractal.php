@@ -75,7 +75,7 @@ class Fractal implements Adapter
     {
         $this->parseFractalIncludes($request);
 
-        $resource = $this->createResource($response, $transformer, $binding->getParameters());
+        $resource = $this->createResource($response, $transformer, $parameters = $binding->getParameters());
 
         // If the response is a paginator then we'll create a new paginator
         // adapter for Laravel and set the paginator instance on our
@@ -98,7 +98,9 @@ class Fractal implements Adapter
 
         $binding->fireCallback($resource, $this->fractal);
 
-        return $this->fractal->createData($resource)->toArray();
+        $identifier = isset($parameters['identifier']) ? $parameters['identifier'] : null;
+
+        return $this->fractal->createData($resource, $identifier)->toArray();
     }
 
     /**
@@ -159,7 +161,7 @@ class Fractal implements Adapter
      */
     public function parseFractalIncludes(Request $request)
     {
-        $includes = $request->get($this->includeKey);
+        $includes = $request->input($this->includeKey);
 
         if (! is_array($includes)) {
             $includes = array_filter(explode($this->includeSeparator, $includes));
