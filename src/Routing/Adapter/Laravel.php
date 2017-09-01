@@ -119,10 +119,6 @@ class Laravel implements Adapter
      */
     public function getRouteProperties($route, Request $request)
     {
-        if (method_exists($route, 'uri') && method_exists($route, 'methods')) {
-            return [$route->uri(), $route->methods(), $route->getAction()];
-        }
-
         return [$route->uri(), $route->methods(), $route->getAction()];
     }
 
